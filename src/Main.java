@@ -131,35 +131,47 @@ public class Main {
             System.out.print("Ingrese el ID del perro a modificar: ");
             int perroId = scanner.nextInt();
             scanner.nextLine();  // Consumir el salto de línea
-            System.out.print("Nuevo nombre del perro: ");
-            String nombre = scanner.nextLine();
-            System.out.print("Nueva raza: ");
-            String raza = scanner.nextLine();
-            System.out.print("Nueva edad: ");
-            int edad = scanner.nextInt();
-            scanner.nextLine();  // Consumir el salto de línea
-            System.out.print("Nuevo color: ");
-            String color = scanner.nextLine();
-            System.out.print("Nuevo dueño: ");
-            String dueño = scanner.nextLine();
-            System.out.print("Nueva fecha de nacimiento (YYYY-MM-DD): ");
-            String fechaNacimiento = scanner.nextLine();
 
-            String sql = "UPDATE perros SET nombre=?, raza=?, edad=?, color=?, dueño=?, fecha_nacimiento=? WHERE id=?";
-            PreparedStatement statement = connection.prepareStatement(sql);
-            statement.setString(1, nombre);
-            statement.setString(2, raza);
-            statement.setInt(3, edad);
-            statement.setString(4, color);
-            statement.setString(5, dueño);
-            statement.setString(6, fechaNacimiento);
-            statement.setInt(7, perroId);
+            // Verificar si el perro está marcado como eliminado
+            String checkSql = "SELECT * FROM perros WHERE id = ? AND eliminado = TRUE";
+            PreparedStatement checkStatement = connection.prepareStatement(checkSql);
+            checkStatement.setInt(1, perroId);
+            ResultSet checkResult = checkStatement.executeQuery();
 
-            int rowsAffected = statement.executeUpdate();
-            if (rowsAffected > 0) {
-                System.out.println("Perro modificado correctamente.");
+            if (checkResult.next()) {
+                System.out.println("No se puede modificar un perro marcado como eliminado.");
             } else {
-                System.out.println("No se pudo modificar el perro. Asegúrate de que el ID sea válido.");
+                // Si el perro no está eliminado, proceder con la modificación
+                System.out.print("Nuevo nombre del perro: ");
+                String nombre = scanner.nextLine();
+                System.out.print("Nueva raza: ");
+                String raza = scanner.nextLine();
+                System.out.print("Nueva edad: ");
+                int edad = scanner.nextInt();
+                scanner.nextLine();  // Consumir el salto de línea
+                System.out.print("Nuevo color: ");
+                String color = scanner.nextLine();
+                System.out.print("Nuevo dueño: ");
+                String dueño = scanner.nextLine();
+                System.out.print("Nueva fecha de nacimiento (YYYY-MM-DD): ");
+                String fechaNacimiento = scanner.nextLine();
+
+                String sql = "UPDATE perros SET nombre=?, raza=?, edad=?, color=?, dueño=?, fecha_nacimiento=? WHERE id=?";
+                PreparedStatement statement = connection.prepareStatement(sql);
+                statement.setString(1, nombre);
+                statement.setString(2, raza);
+                statement.setInt(3, edad);
+                statement.setString(4, color);
+                statement.setString(5, dueño);
+                statement.setString(6, fechaNacimiento);
+                statement.setInt(7, perroId);
+
+                int rowsAffected = statement.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Perro modificado correctamente.");
+                } else {
+                    System.out.println("No se pudo modificar el perro. Asegúrate de que el ID sea válido.");
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -172,15 +184,26 @@ public class Main {
             System.out.print("Ingrese el ID del perro a eliminar: ");
             int perroId = scanner.nextInt();
 
-            String sql = "UPDATE perros SET eliminado = TRUE WHERE id = ?";
-            PreparedStatement statement = connection.prepareStatement(sql);
-            statement.setInt(1, perroId);
+            // Verificar si el perro ya está eliminado
+            String checkSql = "SELECT * FROM perros WHERE id = ? AND eliminado = TRUE";
+            PreparedStatement checkStatement = connection.prepareStatement(checkSql);
+            checkStatement.setInt(1, perroId);
+            ResultSet checkResult = checkStatement.executeQuery();
 
-            int rowsAffected = statement.executeUpdate();
-            if (rowsAffected > 0) {
-                System.out.println("Perro marcado como eliminado correctamente.");
+            if (checkResult.next()) {
+                System.out.println("El perro ya ha sido eliminado anteriormente.");
             } else {
-                System.out.println("No se pudo marcar el perro como eliminado. Asegúrate de que el ID sea válido.");
+                // Si el perro no está eliminado, marcarlo como eliminado
+                String sql = "UPDATE perros SET eliminado = TRUE WHERE id = ?";
+                PreparedStatement statement = connection.prepareStatement(sql);
+                statement.setInt(1, perroId);
+
+                int rowsAffected = statement.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Perro marcado como eliminado correctamente.");
+                } else {
+                    System.out.println("No se pudo marcar el perro como eliminado. Asegúrate de que el ID sea válido.");
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -191,7 +214,7 @@ public class Main {
 
     private static void mostrarTodosLosPerros(Connection connection) {
         try {
-            String sql = "SELECT * FROM perros";
+            String sql = "SELECT * FROM perros WHERE eliminado = FALSE"; // Agregar una condición para filtrar los perros no eliminados
             PreparedStatement statement = connection.prepareStatement(sql);
             ResultSet resultSet = statement.executeQuery();
 
@@ -223,11 +246,13 @@ public class Main {
             System.out.print("Ingrese el nombre del perro a buscar: ");
             String nombre = scanner.nextLine();
 
-            String sql = "SELECT * FROM perros WHERE nombre LIKE ?";
+            String sql = "SELECT * FROM perros WHERE nombre LIKE ? AND eliminado = FALSE"; // Agregar condición para verificar si no está eliminado
             PreparedStatement statement = connection.prepareStatement(sql);
             statement.setString(1, "%" + nombre + "%");
 
             ResultSet resultSet = statement.executeQuery();
+
+            boolean encontrado = false; // Variable para rastrear si se encontró al menos un perro
 
             while (resultSet.next()) {
                 int id = resultSet.getInt("id");
@@ -246,11 +271,18 @@ public class Main {
                 System.out.println("Dueño: " + dueño);
                 System.out.println("Fecha de Nacimiento: " + fechaNacimiento);
                 System.out.println("----------------------");
+
+                encontrado = true; // Marcar como encontrado si al menos un perro coincide con la búsqueda
+            }
+
+            if (!encontrado) {
+                System.out.println("No se ha encontrado ningún perro con ese nombre o el perro está marcado como eliminado.");
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
+
 
     private static void busquedaConFiltrado(Connection connection) {
         try {
@@ -260,14 +292,32 @@ public class Main {
             System.out.print("Ingrese la edad para filtrar (deje en blanco para omitir): ");
             String edadInput = scanner.nextLine();
 
-            String sql = "SELECT * FROM perros WHERE (raza LIKE ? OR ? IS NULL) AND (edad = ? OR ? IS NULL)";
+            String sql = "SELECT * FROM perros WHERE eliminado = FALSE";
+
+            if (!raza.isEmpty()) {
+                sql += " AND raza LIKE ?";
+            }
+
+            if (!edadInput.isEmpty()) {
+                sql += " AND edad = ?";
+            }
+
             PreparedStatement statement = connection.prepareStatement(sql);
-            statement.setString(1, "%" + raza + "%");
-            statement.setString(2, raza.isEmpty() ? "null" : raza);
-            statement.setString(3, edadInput);
-            statement.setString(4, edadInput.isEmpty() ? "null" : edadInput);
+
+            int parameterIndex = 1; // Índice del parámetro en la consulta SQL
+
+            if (!raza.isEmpty()) {
+                statement.setString(parameterIndex, "%" + raza + "%");
+                parameterIndex++;
+            }
+
+            if (!edadInput.isEmpty()) {
+                statement.setInt(parameterIndex, Integer.parseInt(edadInput));
+            }
 
             ResultSet resultSet = statement.executeQuery();
+
+            boolean encontrado = false; // Variable para rastrear si se encontró al menos un perro
 
             while (resultSet.next()) {
                 int id = resultSet.getInt("id");
@@ -286,11 +336,18 @@ public class Main {
                 System.out.println("Dueño: " + dueño);
                 System.out.println("Fecha de Nacimiento: " + fechaNacimiento);
                 System.out.println("----------------------");
+
+                encontrado = true; // Marcar como encontrado si al menos un perro coincide con la búsqueda
+            }
+
+            if (!encontrado) {
+                System.out.println("No se ha encontrado ningún perro que coincida con los filtros o el perro está marcado como eliminado.");
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
+
 
     private static void recuperarUltimoElementoBorrado(Connection connection) {
         try {
@@ -315,6 +372,18 @@ public class Main {
                 System.out.println("Color: " + color);
                 System.out.println("Dueño: " + dueño);
                 System.out.println("Fecha de Nacimiento: " + fechaNacimiento);
+
+                // Ahora, actualizamos el registro marcando eliminado como 0
+                String updateSql = "UPDATE perros SET eliminado = FALSE WHERE id = ?";
+                PreparedStatement updateStatement = connection.prepareStatement(updateSql);
+                updateStatement.setInt(1, id);
+                int rowsAffected = updateStatement.executeUpdate();
+
+                if (rowsAffected > 0) {
+                    System.out.println("El perro ha sido recuperado y marcado como no eliminado.");
+                } else {
+                    System.out.println("No se pudo marcar el perro como no eliminado. Asegúrate de que el ID sea válido.");
+                }
             } else {
                 System.out.println("No se encontraron registros eliminados.");
             }
